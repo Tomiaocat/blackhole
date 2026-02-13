@@ -107,15 +107,37 @@ function showVectorSelector() {
   const loginScreen = document.getElementById('login-screen');
   const vectorContainer = document.createElement('div');
   vectorContainer.id = 'vector-selector';
-  vectorContainer.style.cssText = 'display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 400px; margin: 1rem 0;';
+  vectorContainer.style.cssText = 'display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; max-width: 500px; margin: 1rem 0;';
 
-  gameState.vectors.forEach(vector => {
+  gameState.vectors.forEach((vector, index) => {
     const btn = document.createElement('button');
-    btn.textContent = vector.name;
-    btn.style.cssText = 'padding: 0.5rem 1rem; border: 2px solid #8a2be2; border-radius: 10px; background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; transition: all 0.3s;';
+    btn.style.cssText = `
+      width: 60px;
+      height: 60px;
+      border: 3px solid #8a2be2;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.1);
+      cursor: pointer;
+      transition: all 0.3s;
+      overflow: hidden;
+      padding: 0;
+    `;
+
+    // 添加图片预览
+    const img = document.createElement('img');
+    img.src = vector.path;
+    img.style.cssText = 'width: 100%; height: 100%; object-fit: cover;';
+    btn.appendChild(img);
+
     btn.onclick = () => selectVector(vector, btn);
     vectorContainer.appendChild(btn);
   });
+
+  // 添加提示文字
+  const hint = document.createElement('div');
+  hint.style.cssText = 'width: 100%; text-align: center; color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-top: 0.5rem;';
+  hint.textContent = '点击选择角色形象';
+  vectorContainer.appendChild(hint);
 
   // 插入到 nickname input 之前
   const nicknameInput = document.getElementById('nickname');
@@ -130,10 +152,10 @@ function selectVector(vector, btn) {
   // 高亮选中的按钮
   document.querySelectorAll('#vector-selector button').forEach(b => {
     b.style.borderColor = '#8a2be2';
-    b.style.background = 'rgba(255,255,255,0.1)';
+    b.style.transform = 'scale(1)';
   });
   btn.style.borderColor = '#da70d6';
-  btn.style.background = 'rgba(218,112,214,0.3)';
+  btn.style.transform = 'scale(1.15)';
 }
 
 // 绘制网格背景
