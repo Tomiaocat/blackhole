@@ -176,8 +176,8 @@ function handleApiRequest(req, res, filePath) {
         res.end(JSON.stringify({ error: '无法读取向量图目录' }));
         return;
       }
-      const vectors = files.filter(f => f.endsWith('.svg')).map(f => ({
-        name: f.replace('.svg', ''),
+      const vectors = files.filter(f => f.endsWith('.png') && !f.includes('Gemini_Generated_Image')).map(f => ({
+        name: f.replace('.png', ''),
         path: `/assets/vectors/${f}`
       }));
       res.writeHead(200, { 'Content-Type': 'application/json' });

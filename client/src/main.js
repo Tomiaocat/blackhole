@@ -107,15 +107,37 @@ function showVectorSelector() {
   const loginScreen = document.getElementById('login-screen');
   const vectorContainer = document.createElement('div');
   vectorContainer.id = 'vector-selector';
-  vectorContainer.style.cssText = 'display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; max-width: 400px; margin: 1rem 0;';
+  vectorContainer.style.cssText = 'display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; max-width: 500px; margin: 1rem 0;';
 
-  gameState.vectors.forEach(vector => {
+  gameState.vectors.forEach((vector, index) => {
     const btn = document.createElement('button');
-    btn.textContent = vector.name;
-    btn.style.cssText = 'padding: 0.5rem 1rem; border: 2px solid #8a2be2; border-radius: 10px; background: rgba(255,255,255,0.1); color: #fff; cursor: pointer; transition: all 0.3s;';
+    btn.style.cssText = `
+      width: 60px;
+      height: 60px;
+      border: 3px solid #8a2be2;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.1);
+      cursor: pointer;
+      transition: all 0.3s;
+      overflow: hidden;
+      padding: 0;
+    `;
+
+    // 添加图片预览
+    const img = document.createElement('img');
+    img.src = vector.path;
+    img.style.cssText = 'width: 100%; height: 100%; object-fit: cover;';
+    btn.appendChild(img);
+
     btn.onclick = () => selectVector(vector, btn);
     vectorContainer.appendChild(btn);
   });
+
+  // 添加提示文字
+  const hint = document.createElement('div');
+  hint.style.cssText = 'width: 100%; text-align: center; color: rgba(255,255,255,0.5); font-size: 0.85rem; margin-top: 0.5rem;';
+  hint.textContent = '点击选择角色形象';
+  vectorContainer.appendChild(hint);
 
   // 插入到 nickname input 之前
   const nicknameInput = document.getElementById('nickname');
@@ -130,10 +152,10 @@ function selectVector(vector, btn) {
   // 高亮选中的按钮
   document.querySelectorAll('#vector-selector button').forEach(b => {
     b.style.borderColor = '#8a2be2';
-    b.style.background = 'rgba(255,255,255,0.1)';
+    b.style.transform = 'scale(1)';
   });
   btn.style.borderColor = '#da70d6';
-  btn.style.background = 'rgba(218,112,214,0.3)';
+  btn.style.transform = 'scale(1.15)';
 }
 
 // 绘制网格背景
@@ -500,9 +522,27 @@ function updateGameState(state) {
       // 更新 PixiJS 视口
       app.stage.position.set(-gameState.camera.x, -gameState.camera.y);
 
-      document.getElementById('score').textContent = `分数: ${p.score || 0}`;
-      document.getElementById('level').textContent = `等级: ${p.level || 1}`;
-      document.getElementById('mass').textContent = `半径: ${Math.floor(p.radius)}`;
+      // 更新美化后的统计面板
+      document.getElementById('score').textContent = p.score || 0;
+      document.getElementById('level').textContent = p.level || 1;
+      document.getElementById('radius').textContent = Math.floor(p.radius);
+      document.getElementById('speed').textContent = p.speed?.toFixed(1) || '3.0';
+
+      // 更新自己的发光效果（圣光闪烁）
+      // 更新吸铁石发光
+      const magnetGlow = playerSprite.getChildByName('magnetGlow');
+      magnetGlow.clear();
+      if (p.magnetActive) {
+        magnetGlow.circle(0, 0, playerSprite.radius * 2.2);
+        magnetGlow.fill({ color: 0x00ffff, alpha: 0.15 });
+        magnetGlow.circle(0, 0, playerSprite.radius * 1.8);
+        magnetGlow.stroke({ width: 2, color: 0x00ffff, alpha: 0.4 });
+      }
+
+      // 根据速度旋转玩家
+      if (p.direction && (p.direction.x !== 0 || p.direction.y !== 0)) {
+        playerSprite.rotation += 0.05 * p.speed;
+      }
     } else {
       if (!playerSprites.has(p.id)) {
         const sprite = createPlayerSprite(p);
@@ -588,7 +628,7 @@ const vectorTextures = {};
 async function preloadVectorSprites() {
   for (const vec of gameState.vectors) {
     try {
-      // 使用 HTML Image 加载 SVG
+      // 使用 HTML Image 加载 PNG
       const img = new Image();
       img.crossOrigin = 'anonymous';
       await new Promise((resolve, reject) => {
@@ -599,9 +639,9 @@ async function preloadVectorSprites() {
       // 创建 PixiJS Texture
       const texture = PIXI.Texture.from(img);
       vectorTextures[vec.name] = texture;
-      console.log('加载矢量图成功:', vec.name);
+      console.log('加载图片成功:', vec.name);
     } catch (err) {
-      console.error('加载矢量图失败:', vec.name, err);
+      console.error('加载图片失败:', vec.name, err);
     }
   }
 }
@@ -611,13 +651,18 @@ function createPlayerSprite(player) {
   const container = new PIXI.Container();
   container.playerId = player.id;
 
-  // 外圈发光（吸铁石激活时）
-  const glow = new PIXI.Graphics();
-  glow.name = 'glow';
-  container.addChild(glow);
+  // 自己的圣光（永久发光，用于区分自己）
+  const selfGlow = new PIXI.Graphics();
+  selfGlow.name = 'selfGlow';
+  container.addChild(selfGlow);
+
+  // 吸铁石发光（激活时）
+  const magnetGlow = new PIXI.Graphics();
+  magnetGlow.name = 'magnetGlow';
+  container.addChild(magnetGlow);
 
   // 获取选中的矢量图
-  const selectedVectorName = localStorage.getItem('blackhole_vector')?.replace('/assets/vectors/', '').replace('.svg', '');
+  const selectedVectorName = localStorage.getItem('blackhole_vector')?.replace('/assets/vectors/', '').replace('.png', '').replace('.svg', '');
 
   let sprite = null;
   if (selectedVectorName && vectorTextures[selectedVectorName]) {
@@ -668,15 +713,15 @@ function createPlayerSprite(player) {
 
 // 更新玩家精灵大小
 function updatePlayerSpriteSize(container, player) {
-  const glow = container.getChildByName('glow');
+  const magnetGlow = container.getChildByName('magnetGlow');
   const body = container.getChildByName('body');
   const text = container.getChildByName('nickname');
 
-  // 更新发光
-  glow.clear();
+  // 更新吸铁石发光
+  magnetGlow.clear();
   if (player.magnetActive) {
-    glow.circle(0, 0, player.radius + 10);
-    glow.fill({ color: 0x00ffff, alpha: 0.3 });
+    magnetGlow.circle(0, 0, player.radius * 2);
+    magnetGlow.fill({ color: 0x00ffff, alpha: 0.15 });
   }
 
   // 更新身体（可能是 Graphics 或 Sprite）
@@ -714,7 +759,25 @@ function updateLeaderboard(leaderboard) {
 
   leaderboard.forEach((entry, index) => {
     const li = document.createElement('li');
-    li.textContent = `${entry.nickname}: ${entry.radius}`;
+
+    // 排名徽章
+    const badge = document.createElement('span');
+    badge.className = `rank-badge rank-${index + 1}`;
+    badge.textContent = index + 1;
+
+    // 玩家名
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'player-name';
+    nameSpan.textContent = entry.nickname;
+
+    // 半径值
+    const radiusSpan = document.createElement('span');
+    radiusSpan.className = 'player-radius';
+    radiusSpan.textContent = `${Math.floor(entry.radius)}`;
+
+    li.appendChild(badge);
+    li.appendChild(nameSpan);
+    li.appendChild(radiusSpan);
 
     if (entry.id === gameState.playerId) {
       li.classList.add('me');
@@ -777,8 +840,21 @@ function handleRespawn(data) {
 }
 
 // 游戏循环
+let glowPulse = 0;
 function gameLoop() {
-  // 客户端预测和插值逻辑可以在这里添加
+  // 圣光中频闪烁效果
+  if (playerSprite) {
+    glowPulse += 0.1;
+    const pulse = 0.3 + Math.sin(glowPulse) * 0.2; // 0.1 ~ 0.5
+    const selfGlow = playerSprite.getChildByName('selfGlow');
+    if (selfGlow) {
+      selfGlow.clear();
+      selfGlow.circle(0, 0, playerSprite.radius + 8);
+      selfGlow.stroke({ width: 3, color: 0xda70d6, alpha: pulse });
+      selfGlow.circle(0, 0, playerSprite.radius + 15);
+      selfGlow.stroke({ width: 1, color: 0xda70d6, alpha: pulse * 0.5 });
+    }
+  }
 }
 
 // 启动
