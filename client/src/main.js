@@ -528,8 +528,16 @@ function updateGameState(state) {
       document.getElementById('radius').textContent = Math.floor(p.radius);
       document.getElementById('speed').textContent = p.speed?.toFixed(1) || '3.0';
 
-      // 更新自己的发光效果
-      updateSelfGlow(playerSprite, p);
+      // 更新自己的发光效果（圣光闪烁）
+      // 更新吸铁石发光
+      const magnetGlow = playerSprite.getChildByName('magnetGlow');
+      magnetGlow.clear();
+      if (p.magnetActive) {
+        magnetGlow.circle(0, 0, playerSprite.radius * 2.2);
+        magnetGlow.fill({ color: 0x00ffff, alpha: 0.15 });
+        magnetGlow.circle(0, 0, playerSprite.radius * 1.8);
+        magnetGlow.stroke({ width: 2, color: 0x00ffff, alpha: 0.4 });
+      }
 
       // 根据速度旋转玩家
       if (p.direction && (p.direction.x !== 0 || p.direction.y !== 0)) {
@@ -705,17 +713,9 @@ function createPlayerSprite(player) {
 
 // 更新玩家精灵大小
 function updatePlayerSpriteSize(container, player) {
-  const selfGlow = container.getChildByName('selfGlow');
   const magnetGlow = container.getChildByName('magnetGlow');
   const body = container.getChildByName('body');
   const text = container.getChildByName('nickname');
-
-  // 更新自己的圣光（总是显示，用于区分自己）
-  selfGlow.clear();
-  selfGlow.circle(0, 0, player.radius + 8);
-  selfGlow.stroke({ width: 3, color: 0xda70d6, alpha: 0.6 });
-  selfGlow.circle(0, 0, player.radius + 15);
-  selfGlow.stroke({ width: 1, color: 0xda70d6, alpha: 0.3 });
 
   // 更新吸铁石发光
   magnetGlow.clear();
@@ -741,18 +741,6 @@ function updatePlayerSpriteSize(container, player) {
   // 更新名字位置
   text.y = -player.radius - 15;
   text.style.fontSize = Math.max(12, player.radius * 0.4);
-}
-
-// 更新自己的圣光（纯UI标记）
-function updateSelfGlow(container, player) {
-  const selfGlow = container.getChildByName('selfGlow');
-  if (selfGlow) {
-    selfGlow.clear();
-    selfGlow.circle(0, 0, player.radius + 8);
-    selfGlow.stroke({ width: 3, color: 0xda70d6, alpha: 0.6 });
-    selfGlow.circle(0, 0, player.radius + 15);
-    selfGlow.stroke({ width: 1, color: 0xda70d6, alpha: 0.3 });
-  }
 }
 
 // 移除玩家
@@ -852,8 +840,21 @@ function handleRespawn(data) {
 }
 
 // 游戏循环
+let glowPulse = 0;
 function gameLoop() {
-  // 客户端预测和插值逻辑可以在这里添加
+  // 圣光中频闪烁效果
+  if (playerSprite) {
+    glowPulse += 0.1;
+    const pulse = 0.3 + Math.sin(glowPulse) * 0.2; // 0.1 ~ 0.5
+    const selfGlow = playerSprite.getChildByName('selfGlow');
+    if (selfGlow) {
+      selfGlow.clear();
+      selfGlow.circle(0, 0, playerSprite.radius + 8);
+      selfGlow.stroke({ width: 3, color: 0xda70d6, alpha: pulse });
+      selfGlow.circle(0, 0, playerSprite.radius + 15);
+      selfGlow.stroke({ width: 1, color: 0xda70d6, alpha: pulse * 0.5 });
+    }
+  }
 }
 
 // 启动
