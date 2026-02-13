@@ -1,0 +1,45 @@
+{
+  "map": {
+    "width": 4000,
+    "height": 4000
+  },
+  "food": {
+    "totalCount": 200,
+    "radius": 8,
+    "mass": 5,
+    "respawnDelay": 15000,
+    "types": {
+      "red": { "effect": "radius", "value": 3 },
+      "yellow": { "effect": "speed", "value": 3 }
+    }
+  },
+  "player": {
+    "initialRadius": 30,
+    "initialMass": 100,
+    "initialSpeed": 5,
+    "decay": {
+      "startDelay": 4000,
+      "radiusDecay": { "percent": 1, "fixed": 1 },
+      "speedDecayThreshold": 0.5,
+      "speedDecay": { "percent": 3, "fixed": 2 }
+    }
+  },
+  "blackhole": {
+    "spawnCount": 3,
+    "mass": 5000,
+    "radius": 80
+  },
+  "magnet": {
+    "spawnInterval": 30000,
+    "duration": 15000,
+    "effectRadius": 1.7,
+    "effectDescription": "+70% 吞噬范围"
+  },
+  "eatMultiplier": 1.1,
+  "respawnDelay": 5000,
+  "seasonDuration": 3600000,
+  "growthCurve": {
+    "levelMultiplier": 1.2,
+    "baseRadiusPerLevel": 10
+  }
+}

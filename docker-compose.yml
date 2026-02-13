@@ -3,13 +3,19 @@ version: '3.8'
 services:
   game-server:
     build:
-      context: ./server
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: server/Dockerfile
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=production
       - PORT=3000
+      # MySQL 配置 - 请通过 .env 文件或环境变量设置
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME:-blackhole}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
