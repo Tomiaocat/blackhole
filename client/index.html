@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>黑洞大作战</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      overflow: hidden;
+      background: #0a0a0f;
+      font-family: 'Segoe UI', Arial, sans-serif;
+    }
+    #game-container {
+      width: 100vw;
+      height: 100vh;
+    }
+    #login-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
+      z-index: 10;
+    }
+    #login-screen h1 {
+      font-size: 4rem;
+      color: #fff;
+      text-shadow: 0 0 20px rgba(138, 43, 226, 0.8);
+      margin-bottom: 2rem;
+    }
+    #login-screen input {
+      padding: 1rem 2rem;
+      font-size: 1.2rem;
+      border: 2px solid #8a2be2;
+      border-radius: 30px;
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+      outline: none;
+      margin-bottom: 1rem;
+      width: 300px;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+    #login-screen input:focus {
+      border-color: #da70d6;
+      box-shadow: 0 0 20px rgba(138, 43, 226, 0.5);
+    }
+    #login-screen input::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+    #login-screen button {
+      padding: 1rem 3rem;
+      font-size: 1.2rem;
+      border: none;
+      border-radius: 30px;
+      background: linear-gradient(45deg, #8a2be2, #da70d6);
+      color: #fff;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 1rem;
+    }
+    #login-screen button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 30px rgba(138, 43, 226, 0.6);
+    }
+    #ui-overlay {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      color: #fff;
+      z-index: 5;
+      display: none;
+    }
+    #leaderboard {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 1rem;
+      border-radius: 10px;
+      color: #fff;
+      z-index: 5;
+      display: none;
+      min-width: 200px;
+    }
+    #leaderboard h3 {
+      margin-bottom: 0.5rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+      padding-bottom: 0.5rem;
+    }
+    #leaderboard ol {
+      list-style: none;
+      padding: 0;
+    }
+    #leaderboard li {
+      padding: 0.3rem 0;
+    }
+    #leaderboard li.me {
+      color: #da70d6;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div id="game-container"></div>
+
+  <div id="login-screen">
+    <h1>🕳️ 黑洞大作战</h1>
+    <input type="text" id="nickname" placeholder="输入你的昵称" maxlength="20">
+    <button id="start-btn">开始游戏</button>
+  </div>
+
+  <div id="ui-overlay">
+    <div id="score">分数: 0</div>
+    <div id="mass">质量: 100</div>
+  </div>
+
+  <div id="leaderboard">
+    <h3>排行榜</h3>
+    <ol id="leaderboard-list"></ol>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
