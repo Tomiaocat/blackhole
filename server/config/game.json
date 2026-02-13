@@ -4,24 +4,37 @@
     "height": 4000
   },
   "food": {
-    "totalCount": 200,
+    "totalCount": 2000,
     "radius": 8,
     "mass": 5,
     "respawnDelay": 15000,
+    "ratio": {
+      "red": 75,
+      "yellow": 25
+    },
     "types": {
       "red": { "effect": "radius", "value": 3 },
       "yellow": { "effect": "speed", "value": 3 }
+    },
+    "redStar": {
+      "distribution": {
+        "1": 60,
+        "2": 20,
+        "3": 10,
+        "4": 6,
+        "5": 4
+      },
+      "radiusMultiplier": 1
     }
   },
   "player": {
     "initialRadius": 30,
     "initialMass": 100,
-    "initialSpeed": 5,
-    "decay": {
-      "startDelay": 4000,
-      "radiusDecay": { "percent": 1, "fixed": 1 },
-      "speedDecayThreshold": 0.5,
-      "speedDecay": { "percent": 3, "fixed": 2 }
+    "initialSpeed": 3,
+    "levelUp": {
+      "baseExp": 100,
+      "expMultiplier": 100,
+      "radiusBonus": 10
     }
   },
   "blackhole": {
@@ -32,8 +45,8 @@
   "magnet": {
     "spawnInterval": 30000,
     "duration": 15000,
-    "effectRadius": 1.7,
-    "effectDescription": "+70% 吞噬范围"
+    "effectRadius": 21,
+    "effectDescription": "+2000% 吞噬范围"
   },
   "eatMultiplier": 1.1,
   "respawnDelay": 5000,

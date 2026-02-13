@@ -4,3 +4,4 @@ DATABASE.md
 .env
 .env.local
 *.local
+server/config/local.json

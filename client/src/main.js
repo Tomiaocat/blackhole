@@ -46,6 +46,9 @@ async function init() {
   // 获取向量图列表
   await loadVectors();
 
+  // 预加载矢量图
+  await preloadVectorSprites();
+
   // 创建应用
   await app.init({
     width: window.innerWidth,
@@ -188,31 +191,51 @@ function setupEventListeners() {
 
   app.stage.eventMode = 'static';
   app.stage.hitArea = app.screen;
-  app.stage.on('pointermove', handleInput);
+
+  // 使用原生 DOM 事件监听点击
+  app.canvas.addEventListener('pointerdown', handleInput);
 }
 
-// 处理玩家输入
+// 处理玩家输入 - 点击移动
 function handleInput(event) {
-  if (!gameState.connected || !gameState.playerId) return;
+  console.log('点击事件触发!');
+
+  if (!gameState.connected || !gameState.playerId) {
+    console.log('无法移动: connected=' + gameState.connected + ' playerId=' + gameState.playerId);
+    return;
+  }
 
   const rect = app.canvas.getBoundingClientRect();
-  const mouseX = event.global.x - rect.left;
-  const mouseY = event.global.y - rect.top;
+  const mouseX = event.clientX - rect.left;
+  const mouseY = event.clientY - rect.top;
 
-  const centerX = window.innerWidth / 2;
-  const centerY = window.innerHeight / 2;
+  console.log('鼠标位置: (' + mouseX + ',' + mouseY + ') 画布: ' + rect.width + 'x' + rect.height);
 
-  const dx = mouseX - centerX;
-  const dy = mouseY - centerY;
+  // 使用玩家当前的世界坐标（如果有的话）或者使用相机中心
+  let playerX = gameState.camera.x + window.innerWidth / 2;
+  let playerY = gameState.camera.y + window.innerHeight / 2;
 
+  if (playerSprite) {
+    playerX = playerSprite.x;
+    playerY = playerSprite.y;
+  }
+
+  // 鼠标的世界坐标
+  const worldX = mouseX + gameState.camera.x;
+  const worldY = mouseY + gameState.camera.y;
+
+  // 计算方向
+  const dx = worldX - playerX;
+  const dy = worldY - playerY;
   const length = Math.sqrt(dx * dx + dy * dy);
-  if (length > 0) {
+
+  console.log('点击: player=(' + playerX + ',' + playerY + ') target=(' + worldX + ',' + worldY + ')');
+
+  if (length > 5) {
+    const dir = { x: dx / length, y: dy / length };
     socket.send(JSON.stringify({
       type: 'move',
-      direction: {
-        x: dx / length,
-        y: dy / length
-      }
+      direction: dir
     }));
   }
 }
@@ -361,7 +384,8 @@ function handleMagnetActivated(duration) {
     });
     magnetTimerText.x = 20;
     magnetTimerText.y = 80;
-    document.getElementById('ui-overlay').appendChild(magnetTimerText);
+    // 添加到 PixiJS stage 而不是 DOM
+    app.stage.addChild(magnetTimerText);
   }
 
   // 倒计时
@@ -448,13 +472,36 @@ function updateGameState(state) {
       }
       playerSprite.x = p.x;
       playerSprite.y = p.y;
-      playerSprite.radius = p.radius;
       playerSprite.magnetActive = p.magnetActive;
 
-      gameState.camera.x = p.x - window.innerWidth / 2;
-      gameState.camera.y = p.y - window.innerHeight / 2;
+      // 更新大小
+      updatePlayerSpriteSize(playerSprite, p);
 
-      document.getElementById('score').textContent = `分数: ${Math.floor(p.mass)}`;
+      // 计算动态视野：玩家越大，视野越广
+      const baseViewWidth = window.innerWidth;
+      const baseViewHeight = window.innerHeight;
+      const extraView = p.radius * 2; // 每1像素半径增加2像素视野
+      const viewWidth = Math.max(baseViewWidth, baseViewWidth + extraView);
+      const viewHeight = Math.max(baseViewHeight, baseViewHeight + extraView);
+
+      // 计算相机位置（以玩家为中心）
+      let camX = p.x - viewWidth / 2;
+      let camY = p.y - viewHeight / 2;
+
+      // 边界限制：相机不能超出地图范围
+      const mapWidth = 4000;
+      const mapHeight = 4000;
+      camX = Math.max(0, Math.min(mapWidth - viewWidth, camX));
+      camY = Math.max(0, Math.min(mapHeight - viewHeight, camY));
+
+      gameState.camera.x = camX;
+      gameState.camera.y = camY;
+
+      // 更新 PixiJS 视口
+      app.stage.position.set(-gameState.camera.x, -gameState.camera.y);
+
+      document.getElementById('score').textContent = `分数: ${p.score || 0}`;
+      document.getElementById('level').textContent = `等级: ${p.level || 1}`;
       document.getElementById('mass').textContent = `半径: ${Math.floor(p.radius)}`;
     } else {
       if (!playerSprites.has(p.id)) {
@@ -465,7 +512,8 @@ function updateGameState(state) {
       const sprite = playerSprites.get(p.id);
       sprite.x = p.x;
       sprite.y = p.y;
-      sprite.radius = p.radius;
+      // 更新其他玩家大小
+      updatePlayerSpriteSize(sprite, p);
     }
   });
 
@@ -481,8 +529,6 @@ function updateGameState(state) {
   state.blackholes.forEach(b => {
     // 黑洞已经在初始绘制中创建，不需要动态更新
   });
-
-  app.stage.position.set(-gameState.camera.x, -gameState.camera.y);
 }
 
 // 创建食物精灵
@@ -537,30 +583,63 @@ function createMagnetSprite(magnet) {
   return graphics;
 }
 
+// 预加载矢量图
+const vectorTextures = {};
+async function preloadVectorSprites() {
+  for (const vec of gameState.vectors) {
+    try {
+      // 使用 HTML Image 加载 SVG
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = vec.path;
+      });
+      // 创建 PixiJS Texture
+      const texture = PIXI.Texture.from(img);
+      vectorTextures[vec.name] = texture;
+      console.log('加载矢量图成功:', vec.name);
+    } catch (err) {
+      console.error('加载矢量图失败:', vec.name, err);
+    }
+  }
+}
+
 // 创建玩家精灵
 function createPlayerSprite(player) {
   const container = new PIXI.Container();
+  container.playerId = player.id;
 
   // 外圈发光（吸铁石激活时）
-  if (player.magnetActive || (gameState.playerId && player.id === gameState.playerId && gameState.magnetActive)) {
-    const glow = new PIXI.Graphics();
-    glow.circle(0, 0, player.radius + 10);
-    glow.fill({ color: 0x00ffff, alpha: 0.3 });
-    container.addChild(glow);
+  const glow = new PIXI.Graphics();
+  glow.name = 'glow';
+  container.addChild(glow);
+
+  // 获取选中的矢量图
+  const selectedVectorName = localStorage.getItem('blackhole_vector')?.replace('/assets/vectors/', '').replace('.svg', '');
+
+  let sprite = null;
+  if (selectedVectorName && vectorTextures[selectedVectorName]) {
+    // 使用矢量图作为玩家外观
+    sprite = new PIXI.Sprite(vectorTextures[selectedVectorName]);
+    sprite.anchor.set(0.5);
+    sprite.name = 'body';
   }
 
-  const graphics = new PIXI.Graphics();
-
-  // 黑洞效果
-  graphics.circle(0, 0, player.radius);
-  graphics.fill(0x1a1a2e);
-  graphics.stroke({ width: 3, color: 0x8a2be2 });
-
-  // 内圈
-  graphics.circle(0, 0, player.radius * 0.7);
-  graphics.fill({ color: 0x2a2a4e, alpha: 0.5 });
-
-  container.addChild(graphics);
+  if (!sprite) {
+    // 默认使用圆形
+    const graphics = new PIXI.Graphics();
+    graphics.name = 'body';
+    graphics.circle(0, 0, player.radius);
+    graphics.fill(0x1a1a2e);
+    graphics.stroke({ width: 3, color: 0x8a2be2 });
+    graphics.circle(0, 0, player.radius * 0.7);
+    graphics.fill({ color: 0x2a2a4e, alpha: 0.5 });
+    container.addChild(graphics);
+  } else {
+    container.addChild(sprite);
+  }
 
   // 玩家名字
   const text = new PIXI.Text({
@@ -572,6 +651,7 @@ function createPlayerSprite(player) {
       align: 'center'
     }
   });
+  text.name = 'nickname';
   text.anchor.set(0.5);
   text.y = -player.radius - 15;
 
@@ -579,9 +659,43 @@ function createPlayerSprite(player) {
 
   container.x = player.x;
   container.y = player.y;
-  container.radius = player.radius;
+
+  // 立即更新大小
+  updatePlayerSpriteSize(container, player);
 
   return container;
+}
+
+// 更新玩家精灵大小
+function updatePlayerSpriteSize(container, player) {
+  const glow = container.getChildByName('glow');
+  const body = container.getChildByName('body');
+  const text = container.getChildByName('nickname');
+
+  // 更新发光
+  glow.clear();
+  if (player.magnetActive) {
+    glow.circle(0, 0, player.radius + 10);
+    glow.fill({ color: 0x00ffff, alpha: 0.3 });
+  }
+
+  // 更新身体（可能是 Graphics 或 Sprite）
+  if (body instanceof PIXI.Graphics) {
+    body.clear();
+    body.circle(0, 0, player.radius);
+    body.fill(0x1a1a2e);
+    body.stroke({ width: 3, color: 0x8a2be2 });
+    body.circle(0, 0, player.radius * 0.7);
+    body.fill({ color: 0x2a2a4e, alpha: 0.5 });
+  } else if (body instanceof PIXI.Sprite) {
+    // Sprite 大小随玩家半径变化
+    const scale = player.radius * 2 / Math.max(body.texture.width, body.texture.height);
+    body.scale.set(scale);
+  }
+
+  // 更新名字位置
+  text.y = -player.radius - 15;
+  text.style.fontSize = Math.max(12, player.radius * 0.4);
 }
 
 // 移除玩家

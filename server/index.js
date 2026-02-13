@@ -15,6 +15,16 @@ try {
   process.exit(1);
 }
 
+// 加载本地数据库配置
+const LOCAL_CONFIG_PATH = path.join(__dirname, 'config', 'local.json');
+let LOCAL_CONFIG = null;
+try {
+  LOCAL_CONFIG = JSON.parse(fs.readFileSync(LOCAL_CONFIG_PATH, 'utf-8'));
+  console.log('本地数据库配置加载成功');
+} catch (err) {
+  console.log('未找到本地数据库配置 (config/local.json)');
+}
+
 // 游戏状态
 const game = {
   players: new Map(),
@@ -28,18 +38,28 @@ const game = {
 
 // MySQL 连接
 let mysqlPool = null;
-if (process.env.DB_HOST) {
+const dbConfig = LOCAL_CONFIG?.database || {
+  host: process.env.DB_HOST,
+  port: parseInt(process.env.DB_PORT) || 3306,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME || 'blackhole'
+};
+
+if (dbConfig.host && dbConfig.user && dbConfig.password) {
   const mysql = require('mysql2/promise');
   mysqlPool = mysql.createPool({
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT || 3306,
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'blackhole',
+    host: dbConfig.host,
+    port: dbConfig.port || 3306,
+    user: dbConfig.user,
+    password: dbConfig.password,
+    database: dbConfig.database || 'blackhole',
     waitForConnections: true,
     connectionLimit: 10
   });
   console.log('MySQL 连接池已创建');
+} else {
+  console.log('未配置数据库，将以无持久化模式运行');
 }
 
 // 创建 HTTP 服务器
@@ -119,12 +139,17 @@ function handleApiRequest(req, res, filePath) {
         // 检查玩家是否已存在
         let playerData = null;
         if (mysqlPool) {
-          const [rows] = await mysqlPool.query(
-            'SELECT * FROM current_season_players WHERE token_id = ?',
-            [token]
-          );
-          if (rows.length > 0) {
-            playerData = rows[0];
+          try {
+            const [rows] = await mysqlPool.query(
+              'SELECT * FROM current_season_players WHERE token_id = ?',
+              [token]
+            );
+            if (rows.length > 0) {
+              playerData = rows[0];
+            }
+          } catch (dbErr) {
+            console.error('数据库查询失败:', dbErr.message);
+            // 数据库不可用时继续使用默认值
           }
         }
 
@@ -193,18 +218,48 @@ function calculateSpeed(baseSpeed, bonusPercent) {
   return baseSpeed * (1 + bonusPercent / 100);
 }
 
+// 根据分布获取随机分值
+function getRandomScore() {
+  const distribution = GAME_CONFIG.food.redStar?.distribution || { "1": 60, "2": 20, "3": 10, "4": 6, "5": 4 };
+  const total = Object.values(distribution).reduce((a, b) => a + b, 0);
+  let random = Math.random() * total;
+
+  for (const [score, weight] of Object.entries(distribution)) {
+    random -= weight;
+    if (random <= 0) {
+      return parseInt(score);
+    }
+  }
+  return 1;
+}
+
 // 生成食物
 function generateFood(count) {
+  const ratio = GAME_CONFIG.food.ratio || { red: 50, yellow: 50 };
+  const redThreshold = ratio.red / 100;
+  const radiusMultiplier = GAME_CONFIG.food.redStar?.radiusMultiplier || 1;
+
   for (let i = 0; i < count; i++) {
     const pos = randomPosition();
-    const type = Math.random() < 0.5 ? 'red' : 'yellow';
+    const type = Math.random() < redThreshold ? 'red' : 'yellow';
+
+    let radius = GAME_CONFIG.food.radius;
+    let score = 0;
+
+    if (type === 'red') {
+      // 红色星星：根据分布随机分值1-5
+      score = getRandomScore();
+      radius = score * radiusMultiplier;
+    }
+
     game.food.push({
       id: `food_${Date.now()}_${i}`,
       x: pos.x,
       y: pos.y,
       mass: GAME_CONFIG.food.mass,
-      radius: GAME_CONFIG.food.radius,
+      radius: radius,
       type: type,
+      score: score,
       respawnAt: null
     });
   }
@@ -282,6 +337,9 @@ function handleJoin(ws, data) {
     speed: calculateSpeed(GAME_CONFIG.player.initialSpeed, speedBonus),
     baseSpeed: GAME_CONFIG.player.initialSpeed,
     speedBonus: speedBonus,
+    score: 0,  // 分数
+    level: 1,  // 等级
+    radiusBonus: 0,  // 半径加成（来自等级）
     direction: { x: 0, y: 0 },
     lastMoveTime: Date.now(),
     lastActivityTime: Date.now(),
@@ -381,25 +439,6 @@ function updateGame() {
       });
     }
 
-    // 检查是否需要衰减
-    if (!player.isMoving && now - player.lastActivityTime > GAME_CONFIG.player.decay.startDelay) {
-      const decayTime = now - player.lastActivityTime - GAME_CONFIG.player.decay.startDelay;
-      const decaySeconds = decayTime / 1000;
-
-      // 半径衰减
-      const radiusDecay = (GAME_CONFIG.player.decay.radiusDecay.percent / 100) +
-        GAME_CONFIG.player.decay.radiusDecay.fixed / player.radius;
-      player.radius *= (1 - radiusDecay * decaySeconds);
-      player.mass = Math.PI * player.radius * player.radius / 4;
-
-      // 速度衰减（当半径小于50%时）
-      if (player.radius < GAME_CONFIG.player.initialRadius * GAME_CONFIG.player.decay.speedDecayThreshold) {
-        const speedDecay = (GAME_CONFIG.player.decay.speedDecay.percent / 100) +
-          GAME_CONFIG.player.decay.speedDecay.fixed / player.baseSpeed;
-        player.speed = calculateSpeed(player.baseSpeed, player.speedBonus * (1 - speedDecay * decaySeconds));
-      }
-    }
-
     // 玩家移动
     if (player.direction.x !== 0 || player.direction.y !== 0) {
       player.x += player.direction.x * player.speed;
@@ -433,11 +472,21 @@ function updateGame() {
       if (checkCollision(player, food)) {
         // 应用星星效果
         if (food.type === 'red') {
-          // 红星星：增加半径加成
-          player.radiusBonus = (player.radiusBonus || 0) + GAME_CONFIG.food.types.red.value;
-          player.radius = GAME_CONFIG.player.initialRadius *
-            (1 + player.radiusBonus / 100);
-          player.mass = Math.PI * player.radius * player.radius / 4;
+          // 红星星：增加分数
+          player.score = (player.score || 0) + (food.score || 1);
+
+          // 检查升级
+          const levelUpConfig = GAME_CONFIG.player.levelUp || { baseExp: 100, expMultiplier: 100, radiusBonus: 10 };
+          const expNeeded = levelUpConfig.baseExp + (player.level || 1) * levelUpConfig.expMultiplier;
+
+          if (player.score >= expNeeded) {
+            player.level = (player.level || 1) + 1;
+            // 升级奖励：增加半径
+            player.radiusBonus = (player.radiusBonus || 0) + levelUpConfig.radiusBonus;
+            player.radius = GAME_CONFIG.player.initialRadius + player.radiusBonus;
+            player.mass = Math.PI * player.radius * player.radius / 4;
+            console.log(`玩家 ${player.nickname} 升级到 ${player.level} 级!`);
+          }
         } else if (food.type === 'yellow') {
           // 黄星星：增加速度加成
           player.speedBonus = (player.speedBonus || 0) + GAME_CONFIG.food.types.yellow.value;
@@ -507,16 +556,30 @@ function updateGame() {
   });
 
   // 补充食物
+  const ratio = GAME_CONFIG.food.ratio || { red: 50, yellow: 50 };
+  const redThreshold = ratio.red / 100;
+  const radiusMultiplier = GAME_CONFIG.food.redStar?.radiusMultiplier || 1;
+
   while (game.food.filter(f => !f.respawnAt || f.respawnAt < now).length < GAME_CONFIG.food.totalCount) {
     const pos = randomPosition();
-    const type = Math.random() < 0.5 ? 'red' : 'yellow';
+    const type = Math.random() < redThreshold ? 'red' : 'yellow';
+
+    let radius = GAME_CONFIG.food.radius;
+    let score = 0;
+
+    if (type === 'red') {
+      score = getRandomScore();
+      radius = score * radiusMultiplier;
+    }
+
     game.food.push({
       id: `food_${Date.now()}_${Math.random()}`,
       x: pos.x,
       y: pos.y,
       mass: GAME_CONFIG.food.mass,
-      radius: GAME_CONFIG.food.radius,
+      radius: radius,
       type: type,
+      score: score,
       respawnAt: null
     });
   }
@@ -613,6 +676,8 @@ function broadcastGameState() {
         y: p.y,
         radius: p.radius,
         mass: p.mass,
+        score: p.score || 0,
+        level: p.level || 1,
         magnetActive: p.magnetActive
       })),
       food: game.food.filter(f => !f.respawnAt || f.respawnAt < Date.now()).map(f => ({
@@ -690,6 +755,7 @@ wss.on('connection', (ws) => {
           const player = Array.from(game.players.entries())
             .find(([_, p]) => p.ws === ws);
           if (player) {
+            console.log('收到移动: ' + player[0] + ' direction=' + JSON.stringify(message.direction));
             handleMove(player[0], message);
           }
           break;

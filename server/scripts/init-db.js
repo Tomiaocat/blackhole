@@ -1,7 +1,17 @@
 const mysql = require('mysql2/promise');
+const fs = require('fs');
+const path = require('path');
 
-// 从环境变量读取配置（必需参数，无默认值）
-const config = {
+// 加载本地数据库配置
+const LOCAL_CONFIG_PATH = path.join(__dirname, '..', 'config', 'local.json');
+let LOCAL_CONFIG = null;
+try {
+  LOCAL_CONFIG = JSON.parse(fs.readFileSync(LOCAL_CONFIG_PATH, 'utf-8'));
+} catch (err) {
+  console.log('未找到本地数据库配置');
+}
+
+const config = LOCAL_CONFIG?.database || {
   host: process.env.DB_HOST,
   port: parseInt(process.env.DB_PORT) || 3306,
   user: process.env.DB_USER,
@@ -11,23 +21,20 @@ const config = {
 
 // 验证必需参数
 if (!config.host || !config.user || !config.password) {
-  console.error('错误: 请设置以下环境变量:');
+  console.error('错误: 请在 server/config/local.json 中配置数据库，或设置环境变量:');
   console.error('  DB_HOST - MySQL 主机地址');
   console.error('  DB_USER - MySQL 用户名');
   console.error('  DB_PASSWORD - MySQL 密码');
-  console.error('可选:');
-  console.error('  DB_PORT - 端口 (默认 3306)');
-  console.error('  DB_NAME - 数据库名 (默认 blackhole)');
   process.exit(1);
 }
 
 async function initDb() {
   const connection = await mysql.createConnection({
     host: config.host,
-    port: config.port,
+    port: config.port || 3306,
     user: config.user,
     password: config.password,
-    database: config.database,
+    database: config.database || 'blackhole',
     multipleStatements: true
   });
 
