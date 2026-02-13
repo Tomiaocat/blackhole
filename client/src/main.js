@@ -626,6 +626,7 @@ function createMagnetSprite(magnet) {
 // 预加载矢量图
 const vectorTextures = {};
 async function preloadVectorSprites() {
+  console.log('开始预加载图片，数量:', gameState.vectors.length);
   for (const vec of gameState.vectors) {
     try {
       // 使用 HTML Image 加载 PNG
@@ -633,17 +634,21 @@ async function preloadVectorSprites() {
       img.crossOrigin = 'anonymous';
       await new Promise((resolve, reject) => {
         img.onload = resolve;
-        img.onerror = reject;
+        img.onerror = (e) => {
+          console.error('图片加载失败:', vec.path, e);
+          reject(new Error('Image load failed'));
+        };
         img.src = vec.path;
       });
       // 创建 PixiJS Texture
       const texture = PIXI.Texture.from(img);
       vectorTextures[vec.name] = texture;
-      console.log('加载图片成功:', vec.name);
+      console.log('✅ 加载图片成功:', vec.name, '- 已缓存');
     } catch (err) {
-      console.error('加载图片失败:', vec.name, err);
+      console.error('❌ 加载图片失败:', vec.name, err.message);
     }
   }
+  console.log('图片预加载完成，已缓存:', Object.keys(vectorTextures));
 }
 
 // 创建玩家精灵
@@ -662,7 +667,10 @@ function createPlayerSprite(player) {
   container.addChild(magnetGlow);
 
   // 获取选中的矢量图
-  const selectedVectorName = localStorage.getItem('blackhole_vector')?.replace('/assets/vectors/', '').replace('.png', '').replace('.svg', '');
+  const savedVector = localStorage.getItem('blackhole_vector');
+  const selectedVectorName = savedVector?.replace('/assets/vectors/', '').replace('.png', '').replace('.svg', '');
+  console.log('🟢 选择的图片:', savedVector, '-> 名称:', selectedVectorName);
+  console.log('🟢 已缓存的图片:', Object.keys(vectorTextures));
 
   let sprite = null;
   if (selectedVectorName && vectorTextures[selectedVectorName]) {
@@ -670,6 +678,9 @@ function createPlayerSprite(player) {
     sprite = new PIXI.Sprite(vectorTextures[selectedVectorName]);
     sprite.anchor.set(0.5);
     sprite.name = 'body';
+    console.log('✅ 成功创建玩家图片:', selectedVectorName);
+  } else {
+    console.log('⚠️ 使用默认圆形 (未找到图片或未选择)');
   }
 
   if (!sprite) {
