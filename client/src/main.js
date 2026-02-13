@@ -643,12 +643,13 @@ async function preloadVectorSprites() {
       // 创建 PixiJS Texture
       const texture = PIXI.Texture.from(img);
       vectorTextures[vec.name] = texture;
-      console.log('✅ 加载图片成功:', vec.name, '- 已缓存');
+      console.log('✅ 加载图片成功:', vec.name, '- 尺寸:', img.width, 'x', img.height);
     } catch (err) {
       console.error('❌ 加载图片失败:', vec.name, err.message);
     }
   }
   console.log('图片预加载完成，已缓存:', Object.keys(vectorTextures));
+  console.log('纹理详情:', vectorTextures);
 }
 
 // 创建玩家精灵
@@ -669,8 +670,10 @@ function createPlayerSprite(player) {
   // 获取选中的矢量图
   const savedVector = localStorage.getItem('blackhole_vector');
   const selectedVectorName = savedVector?.replace('/assets/vectors/', '').replace('.png', '').replace('.svg', '');
-  console.log('🟢 选择的图片:', savedVector, '-> 名称:', selectedVectorName);
+  console.log('🟢 localStorage 中保存的图片路径:', savedVector);
+  console.log('🟢 解析后的名称:', selectedVectorName);
   console.log('🟢 已缓存的图片:', Object.keys(vectorTextures));
+  console.log('🟢 纹理是否存在:', vectorTextures[selectedVectorName] ? '是' : '否');
 
   let sprite = null;
   if (selectedVectorName && vectorTextures[selectedVectorName]) {
@@ -693,7 +696,12 @@ function createPlayerSprite(player) {
     graphics.circle(0, 0, player.radius * 0.7);
     graphics.fill({ color: 0x2a2a4e, alpha: 0.5 });
     container.addChild(graphics);
+    console.log('⚪ 使用默认圆形');
   } else {
+    // 设置 Sprite 大小
+    const scale = player.radius * 2 / Math.max(sprite.texture.width, sprite.texture.height);
+    sprite.scale.set(scale);
+    console.log('🟣 使用图片 Sprite:', selectedVectorName, '- 原始尺寸:', sprite.texture.width, 'x', sprite.texture.height, '- 缩放:', scale.toFixed(3));
     container.addChild(sprite);
   }
 
@@ -734,6 +742,13 @@ function updatePlayerSpriteSize(container, player) {
     magnetGlow.circle(0, 0, player.radius * 2);
     magnetGlow.fill({ color: 0x00ffff, alpha: 0.15 });
   }
+
+  // 确保 Sprite 大小正确更新
+  if (body instanceof PIXI.Sprite) {
+    const scale = player.radius * 2 / Math.max(body.texture.width, body.texture.height);
+    body.scale.set(scale);
+  }
+
 
   // 更新身体（可能是 Graphics 或 Sprite）
   if (body instanceof PIXI.Graphics) {
