@@ -73,39 +73,140 @@
       transform: scale(1.05);
       box-shadow: 0 0 30px rgba(138, 43, 226, 0.6);
     }
+
+    /* 统计面板 - 美化版本 */
     #ui-overlay {
       position: absolute;
       top: 20px;
       left: 20px;
-      color: #fff;
       z-index: 5;
       display: none;
+      gap: 10px;
     }
+    .stat-panel {
+      background: linear-gradient(135deg, rgba(138, 43, 226, 0.3) 0%, rgba(218, 112, 214, 0.2) 100%);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 15px;
+      padding: 15px 20px;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 4px 20px rgba(138, 43, 226, 0.3);
+      transition: all 0.3s ease;
+    }
+    .stat-panel:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 25px rgba(138, 43, 226, 0.4);
+    }
+    .stat-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+    }
+    .stat-icon.score { background: linear-gradient(45deg, #f39c12, #e74c3c); }
+    .stat-icon.level { background: linear-gradient(45deg, #3498db, #9b59b6); }
+    .stat-icon.radius { background: linear-gradient(45deg, #2ecc71, #1abc9c); }
+    .stat-icon.speed { background: linear-gradient(45deg, #e91e63, #9c27b0); }
+    .stat-info {
+      display: flex;
+      flex-direction: column;
+    }
+    .stat-label {
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.6);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .stat-value {
+      font-size: 1.3rem;
+      font-weight: bold;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    /* 排行榜 - 美化版本 */
     #leaderboard {
       position: absolute;
       top: 20px;
       right: 20px;
-      background: rgba(0, 0, 0, 0.5);
-      padding: 1rem;
-      border-radius: 10px;
+      background: linear-gradient(135deg, rgba(138, 43, 226, 0.25) 0%, rgba(218, 112, 214, 0.15) 100%);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 15px;
+      padding: 15px 20px;
       color: #fff;
       z-index: 5;
       display: none;
-      min-width: 200px;
+      min-width: 220px;
+      box-shadow: 0 4px 20px rgba(138, 43, 226, 0.3);
     }
     #leaderboard h3 {
-      margin-bottom: 0.5rem;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+      margin-bottom: 1rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
       padding-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 1rem;
     }
     #leaderboard ol {
       list-style: none;
       padding: 0;
     }
     #leaderboard li {
-      padding: 0.3rem 0;
+      padding: 0.5rem 0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      transition: all 0.2s ease;
+    }
+    #leaderboard li:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 8px;
+      padding-left: 5px;
+      margin-left: -5px;
+    }
+    #leaderboard li:last-child {
+      border-bottom: none;
+    }
+    .rank-badge {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: bold;
+      background: rgba(255, 255, 255, 0.1);
+    }
+    .rank-1 { background: linear-gradient(45deg, #ffd700, #ffb700); color: #000; }
+    .rank-2 { background: linear-gradient(45deg, #c0c0c0, #a0a0a0); color: #000; }
+    .rank-3 { background: linear-gradient(45deg, #cd7f32, #b8860b); color: #000; }
+    .player-name {
+      flex: 1;
+    }
+    .player-radius {
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.7);
     }
     #leaderboard li.me {
+      background: rgba(218, 112, 214, 0.2);
+      border-radius: 8px;
+      padding: 0.5rem 0.8rem;
+      margin: 0 -0.8rem;
+    }
+    #leaderboard li.me .rank-badge {
+      background: linear-gradient(45deg, #da70d6, #8a2be2);
+      color: #fff;
+    }
+    #leaderboard li.me .player-name {
       color: #da70d6;
       font-weight: bold;
     }
@@ -121,13 +222,38 @@
   </div>
 
   <div id="ui-overlay">
-    <div id="score">分数: 0</div>
-    <div id="level">等级: 1</div>
-    <div id="mass">质量: 100</div>
+    <div class="stat-panel">
+      <div class="stat-icon score">&#9733;</div>
+      <div class="stat-info">
+        <span class="stat-label">Score</span>
+        <span class="stat-value" id="score">0</span>
+      </div>
+    </div>
+    <div class="stat-panel">
+      <div class="stat-icon level">&#9679;</div>
+      <div class="stat-info">
+        <span class="stat-label">Level</span>
+        <span class="stat-value" id="level">1</span>
+      </div>
+    </div>
+    <div class="stat-panel">
+      <div class="stat-icon radius">&#9675;</div>
+      <div class="stat-info">
+        <span class="stat-label">Radius</span>
+        <span class="stat-value" id="radius">30</span>
+      </div>
+    </div>
+    <div class="stat-panel">
+      <div class="stat-icon speed">&#9650;</div>
+      <div class="stat-info">
+        <span class="stat-label">Speed</span>
+        <span class="stat-value" id="speed">3.0</span>
+      </div>
+    </div>
   </div>
 
   <div id="leaderboard">
-    <h3>排行榜</h3>
+    <h3>&#128293; 排行榜</h3>
     <ol id="leaderboard-list"></ol>
   </div>
 
