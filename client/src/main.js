@@ -115,7 +115,7 @@ function showVectorSelector() {
       width: 60px;
       height: 60px;
       border: 3px solid #8a2be2;
-      border-radius: 12px;
+      border-radius: 50%;
       background: rgba(255,255,255,0.1);
       cursor: pointer;
       transition: all 0.3s;
